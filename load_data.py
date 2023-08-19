@@ -59,17 +59,19 @@ class Person:
         return f"Person({self.id}, TZ={self.tz}, EXP={self.exp}, LEAD={self.leader}, {self.team})"
 
 
-def parse_tz(raw_answer: str) -> float:
+TZ_PATTERN = re.compile(r"([+-]?)(\d{1,2})(?::(\d{2}))?$")
+def parse_tz(raw_string: str) -> float:
     """
     Input: timezone string e.g. "-12:30"
     Output: timezone float normalized to 0-24 e.g. 11.5
     """
-    tz_pattern = r"([+-])(\d{1,2})(:30)?"
-    m = re.match(tz_pattern, raw_answer.strip())
-    mult = {"+": 1, "-": -1}[m.group(1)]
+    m = re.match(TZ_PATTERN, raw_string.strip())
+    if m is None:
+        raise Exception(f"Could not parse {raw_string} as a timezone")
+    mult = 1 if m.group(1) in ("", "+") else -1
     hr = int(m.group(2))
-    if m.group(3) != "":
-        hr += .5
+    if m.group(3):
+        hr += int(m.group(3))/60
     return (hr * mult) % 24
 
 
