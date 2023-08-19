@@ -83,18 +83,18 @@ def write_qualified_csv():
     submissions = response.json()
     with open(QUALIFIED_CSV, "w") as file:
         writer = csv.writer(file)
-        writer.writerow(["discord_username", "discord_id", "age", "timezone", "python_experience", "git_experience", "team_leader", "code_jam_experience", "solution"])
+        writer.writerow(["discord_username", "discord_id", "age", "timezone", "python_experience", "git_experience", "team_leader", "lead_priority", "code_jam_experience", "solution"])
         for submission in submissions:
             username = submission["user"]["username"]
             id = submission["user"]["id"]
             age = submission["response"]["age-range"]
             tz = submission["response"]["timezone"]
-            py_exp = submission["response"]["python-experience"]
-            git_exp = submission["response"]["git-experience"]
+            py_exp = PYTHON_EXPERIENCE.index(submission["response"]["python-experience"])
+            git_exp = GIT_EXPERIENCE.index(submission["response"]["git-experience"])
             team_leader = submission["response"]["team-leader"]
             cj_exp = submission["response"]["code-jam-experience"]
             solution = submission["response"]["solution"]
-            writer.writerow([username, id, age, tz, py_exp, git_exp, team_leader, cj_exp, solution])
+            writer.writerow([username, id, age, tz, py_exp, git_exp, team_leader, "", cj_exp, solution])
 
 
 def load_final_participants() -> list[Person]:
@@ -113,7 +113,7 @@ def load_final_participants() -> list[Person]:
             d_id = int(line["discord_id"])
             if (d_id in blacklist) or (d_id not in confirmed):
                 continue
-            qualified[d_id] = {**line, "github_username": confirmed[d_id]["Github Username"]}
+            qualified[d_id] = {**line, "github_username": confirmed[d_id]["github_username"]}
 
     with open(MANUAL_UPSERTIONS_CSV, encoding="utf-8") as file:
         upsertions = {int(line["discord_id"]): line for line in csv.DictReader(file)}
@@ -130,7 +130,7 @@ def load_final_participants() -> list[Person]:
             person_info = {
                 key.strip(): val.strip()
                 for key,val in person_info.items()
-                if key not in ("solution", "code_jam_experience")
+                if key not in ("age", "solution", "code_jam_experience")
             }
 
             name = person_info["discord_username"]
@@ -138,11 +138,12 @@ def load_final_participants() -> list[Person]:
 
             tz = parse_tz(person_info["timezone"])
 
-            pexp = PYTHON_EXPERIENCE.index(person_info["python_experience"])
-            gexp = GIT_EXPERIENCE.index(person_info["git_experience"])
-            exp = pexp + gexp
+            exp = int(person_info["python_experience"]) + int(person_info["git_experience"])
 
-            lead_priority = LEADER.index(person_info["team_leader"])
+            if "lead_priority" in person_info:
+                lead_priority = int(person_info["lead_priority"])
+            else:
+                lead_priority = LEADER.index(person_info["team_leader"])
 
             people.append(Person(d_id, tz, exp, lead_priority, name=name, gh_name=gh_name))
 
