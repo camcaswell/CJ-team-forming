@@ -34,29 +34,28 @@ GIT_EXPERIENCE = (
 )
 LEADER = (
     "No",
-    "Maybe",
+    "I'm OK either way",
     "Yes",
 )
 
 
 class Person:
-    def __init__(self, id: int, tz: float, exp: int, leader: int, *, name: str = "", gh_name: str = ""):
+    def __init__(self, id: int, tz: float, exp: int, lead_priority: int, *, name: str = "", gh_name: str = ""):
         self.id = id
         self.tz = tz % 24
         self.exp = exp
-        self.leader = leader
-        self.team = None
+        self.lead_priority = lead_priority
         self.name = name
         self.gh_name = gh_name
 
-    def __eq__(self, other):
-        return self.id == other.ID
+    def __eq__(self, other: "Person"):
+        return self.id == other.id
 
     def __hash__(self):
         return hash(self.id)
 
     def __repr__(self):
-        return f"Person({self.id}, TZ={self.tz}, EXP={self.exp}, LEAD={self.leader}, {self.team})"
+        return f"Person({self.id}, TZ={self.tz}, EXP={self.exp}, LEAD={self.lead_priority})"
 
 
 TZ_PATTERN = re.compile(r"([+-]?)(\d{1,2})(?::(\d{2}))?$")
@@ -143,18 +142,19 @@ def load_final_participants() -> list[Person]:
             gexp = GIT_EXPERIENCE.index(person_info["git_experience"])
             exp = pexp + gexp
 
-            leader = LEADER.index(person_info["team_leader"])
+            lead_priority = LEADER.index(person_info["team_leader"])
 
-            people.append(Person(d_id, tz, exp, leader, name=name, gh_name=gh_name))
+            people.append(Person(d_id, tz, exp, lead_priority, name=name, gh_name=gh_name))
 
         except Exception as err:
             print(json.dumps(person_info, indent=2))
             raise err
+
     # Sanity checks
     print(f"Loaded info for {len(people)} participants")
     print(f"Timezones: {Counter(p.tz for p in people)}")
     print(f"Exp: {Counter(p.exp for p in people)}")
-    print(f"Leads: {Counter(p.leader for p in people)}")
+    print(f"Leads: {Counter(p.lead_priority for p in people)}")
     return people
 
 

@@ -1,10 +1,7 @@
-from collections import defaultdict
-from math import ceil
-from random import random
-
 from load_data import load_final_participants, Person, write_confirmed_csv, write_qualified_csv
 
 
+# Teams will end up this size or 1 larger.
 TARGET_TEAM_SIZE = 5
 
 
@@ -36,34 +33,14 @@ def exp_improvement(candidate: Person, team: list[Person], global_avg: float) ->
     return before**2 - after**2
 
 
-# def probabilistic_round(value: float) -> int:
-#     """
-#     Round up or down randomly with an expected value of `value`.
-#     """
-#     low = int(value)
-#     p = value - low
-#     return low + (random() < p)
-
-
-# def sprinkle_evenly(*iterables) -> list:
-#     result, *rest = map(list, iterables)
-#     for iterable in rest:
-#         little, big = sorted((result, iterable), key=len)
-#         mix_ratio = len(big) / len(little)
-#         result = []
-#         while little or big:
-#             n = probabilistic_round(mix_ratio)
-#             result.extend(big[-n:])
-#             del big[-n:]
-#             result.extend(little[-1:])
-#             del little[-1:]
-#     return result
-
-
 def form_teams(people: list[Person]):
-
+    """
+    Pick leaders and form teams around them.
+    Leaders are chosen to cover timezones while favoring lead_priority, with experience as a tie-breaker.
+    Teams are chosen to keep each team's timezone span within reason and to equalize avg experience.
+    """
     # Pick leaders
-    potential_leaders = {person for person in people if person.leader>0}
+    potential_leaders = {person for person in people if person.lead_priority>0}
     if (len(potential_leaders)+1) * TARGET_TEAM_SIZE <= len(people):
         raise Exception("Not enough leaders for the target team size.")
     leaders: set[Person] = set()
@@ -80,7 +57,7 @@ def form_teams(people: list[Person]):
                 # treat adjacent timezones the same as distance 0
                 # we don't want to compromise on having good leaders unless it really stretches the timezone range
                 -max(1.5, tz_dist(pl.tz, target_tz)),
-                pl.leader,
+                pl.lead_priority,
                 pl.exp,
             )
         )
@@ -92,13 +69,13 @@ def form_teams(people: list[Person]):
     nonleaders = sorted((p for p in people if p not in leaders), key=lambda p: p.exp)
     global_exp_avg = sum(p.exp for p in people) / len(people)
     ends = (0, -1)
-    for idx in len(range(nonleaders)):
+    for idx in range(len(nonleaders)):
         # Alternate between most/least experienced
         person = nonleaders.pop(ends[idx%2])
         team_options = [team for team in teams if 4 > tz_span(*[p.tz for p in team], person.tz)]
         if team_options:
             # Put on team that complements their exp level the best.
-            best_team_match = max(team_options, key=lambda team: exp_improvement(person, team, global_exp_avg))   # Should we try to minimize the tz_span here? Would force exp values to be commensurable with tz ranges.
+            best_team_match = max(team_options, key=lambda team: exp_improvement(person, team, global_exp_avg))
         else:
             # Put on team with closest TZ.
             best_team_match = min(teams, key=lambda team: tz_span(*[p.tz for p in team], person.tz))
@@ -107,17 +84,28 @@ def form_teams(people: list[Person]):
     # Find easy changes
     for team in teams:
         # leader is the first in the list
-        team[:] = sorted(team, key=lambda p: (p.leader, p.exp), reverse=True)
+        # replace a leader with a better one if they're already on the same team (should be rare)
+        team[:] = sorted(team, key=lambda p: (p.lead_priority, p.exp), reverse=True)
+
+    return teams
 
 
+def write_teams_csv(teams: list[list[Person]]):
+    ...
 
 if __name__ == "__main__":
     # GET and write CSV
-    write_qualified_csv()
+    # write_qualified_csv()
+
     # GET and write CSV
     # Possibly will be manual if we go with a bot button for confirmation.
-    write_confirmed_csv()
+    # write_confirmed_csv()
+
     # Cross reference qualified, confirmed, and blacklisted, then do manual upsertions
     people = load_final_participants()
-    # run algo
-    form_teams(people)
+
+    # Run algo
+    teams = form_teams(people)
+    
+    # write_teams_csv(teams)
+
