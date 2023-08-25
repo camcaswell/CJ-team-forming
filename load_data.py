@@ -16,7 +16,7 @@ load_dotenv()
 TOKEN = os.getenv("PYDIS-FORMS-TOKEN")
 
 QUALIFIER_FORM_URL = "https://forms-api.pythondiscord.com/forms/cj10-2023-qualifier/responses"
-CONFIRMATION_FORM_URL = ""
+CONFIRMATION_FORM_URL = "https://forms-api.pythondiscord.com/forms/cj10-2023-participation-confirmation/responses"
 
 CSV_FOLDER = Path("csv")
 QUALIFIED_CSV = CSV_FOLDER / "qualified.csv"
@@ -105,6 +105,29 @@ def write_qualified_csv():
     logging.info(f"Retrieved {len(submissions)} qualifier responses")
 
 
+def write_confirmed_csv():
+    """
+    Get responses from the confirmation form and write to CSV.
+    """
+    response = requests.get(CONFIRMATION_FORM_URL, cookies={"token": TOKEN})
+    response.raise_for_status()
+    submissions = response.json()
+    participation_count = 0
+    with open(CONFIRMED_CSV, "w") as file:
+        writer = csv.writer(file, lineterminator="\n")
+        writer.writerow(["discord_id", "github_username"])
+        try:
+            for submission in submissions:
+                if submission["response"]["participation"] != "Yes":
+                    continue
+                participation_count += 1
+                writer.writerow([submission["user"]["id"], submission["response"]["github"]])
+        except Exception as err:
+            logging.exception(json.dumps(submission, indent=2))
+            raise err
+    logging.info(f"Retrieved {len(submissions)} confirmation responses, {participation_count} confirmed")
+
+
 def load_final_participants() -> list[Person]:
     """
     Read the 4 CSVs and cross-reference to get final participants.
@@ -169,18 +192,5 @@ def load_final_participants() -> list[Person]:
     logging.info(f"Exp: {sorted(Counter(p.exp for p in people).items())}")
     logging.info(f"Leads: {sorted(Counter(p.lead_priority for p in people).items())}")
     return people
-
-
-#############
-
-
-def write_confirmed_csv():
-    """
-    Get responses from the confirmation form and write to CSV.
-    """
-    response = requests.get(CONFIRMATION_FORM_URL, cookies={"token": TOKEN})
-    response.raise_for_status()
-    submissions = response.json()
-    
 
 
