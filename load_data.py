@@ -1,5 +1,6 @@
 import csv
 import json
+import logging
 import re
 import requests
 from collections import Counter
@@ -95,6 +96,7 @@ def write_qualified_csv():
             cj_exp = submission["response"]["code-jam-experience"]
             solution = submission["response"]["solution"]
             writer.writerow([username, id, age, tz, py_exp, git_exp, team_leader, "", cj_exp, solution])
+    logging.info(f"Retrieved {len(submissions)} qualifier responses")
 
 
 def load_final_participants() -> list[Person]:
@@ -103,9 +105,11 @@ def load_final_participants() -> list[Person]:
     """
     with open(BLACKLIST_CSV, encoding="utf-8") as file:
         blacklist = {line["discord_id"] for line in csv.DictReader(file)}
+    logging.info(f"Loaded {len(blacklist)} blacklisted people")
     
     with open(CONFIRMED_CSV, encoding="utf-8") as file:
         confirmed = {int(line["discord_id"]): line for line in csv.DictReader(file)}
+    logging.info(f"Loaded {len(confirmed)} confirmed people")
 
     with open(QUALIFIED_CSV, encoding="utf-8") as file:
         qualified: dict[int, dict] = {}
@@ -114,9 +118,11 @@ def load_final_participants() -> list[Person]:
             if (d_id in blacklist) or (d_id not in confirmed):
                 continue
             qualified[d_id] = {**line, "github_username": confirmed[d_id]["github_username"]}
+    logging.info(f"Loaded {len(qualified)} qualified people")
 
     with open(MANUAL_UPSERTIONS_CSV, encoding="utf-8") as file:
         upsertions = {int(line["discord_id"]): line for line in csv.DictReader(file)}
+    logging.info(f"Loaded {len(upsertions)} upsertions")
     
     for d_id, upsertion in upsertions.items():
         if d_id not in qualified:
@@ -148,14 +154,14 @@ def load_final_participants() -> list[Person]:
             people.append(Person(d_id, tz, exp, lead_priority, name=name, gh_name=gh_name))
 
         except Exception as err:
-            print(json.dumps(person_info, indent=2))
+            logging.debug(json.dumps(person_info, indent=2))
             raise err
 
     # Sanity checks
-    print(f"Loaded info for {len(people)} participants")
-    print(f"Timezones: {Counter(p.tz for p in people)}")
-    print(f"Exp: {Counter(p.exp for p in people)}")
-    print(f"Leads: {Counter(p.lead_priority for p in people)}")
+    logging.info(f"Loaded info for {len(people)} participants")
+    logging.info(f"Timezones: {sorted(Counter(p.tz for p in people).items())}")
+    logging.info(f"Exp: {sorted(Counter(p.exp for p in people).items())}")
+    logging.info(f"Leads: {sorted(Counter(p.lead_priority for p in people).items())}")
     return people
 
 
