@@ -88,20 +88,24 @@ def write_qualified_csv():
     response = requests.get(QUALIFIER_FORM_URL, cookies={"token": TOKEN})
     response.raise_for_status()
     submissions = response.json()
-    with open(QUALIFIED_CSV, "w") as file:
-        writer = csv.writer(file)
-        writer.writerow(["discord_username", "discord_id", "age", "timezone", "python_experience", "git_experience", "team_leader", "lead_priority", "code_jam_experience", "solution"])
-        for submission in submissions:
-            username = submission["user"]["username"]
-            id = submission["user"]["id"]
-            age = submission["response"]["age-range"]
-            tz = submission["response"]["timezone"]
-            py_exp = PYTHON_EXPERIENCE.index(submission["response"]["python-experience"])
-            git_exp = GIT_EXPERIENCE.index(submission["response"]["git-experience"])
-            team_leader = submission["response"]["team-leader"]
-            cj_exp = submission["response"]["code-jam-experience"]
-            solution = submission["response"]["solution"]
-            writer.writerow([username, id, age, tz, py_exp, git_exp, team_leader, "", cj_exp, solution])
+    with open(QUALIFIED_CSV, "w", encoding="utf-8") as file:
+        writer = csv.writer(file, lineterminator="\n")
+        writer.writerow(["discord_username", "discord_id", "age", "timezone", "python_experience", "git_experience", "team_leader", "lead_priority", "code_jam_experience"])
+        try:
+            for submission in submissions:
+                username = submission["user"]["username"]
+                id = submission["user"]["id"]
+                age = submission["response"]["age-range"]
+                tz = submission["response"]["timezone"]
+                py_exp = submission["response"]["python-experience"].replace("have possible worked", "have possibly worked") # Typo fix in 2023, if it is not 2023 you can delete this
+                py_exp = PYTHON_EXPERIENCE.index(py_exp)
+                git_exp = GIT_EXPERIENCE.index(submission["response"]["git-experience"])
+                team_leader = submission["response"]["team-leader"]
+                cj_exp = submission["response"]["code-jam-experience"]
+                writer.writerow([username, id, age, tz, py_exp, git_exp, team_leader, "", cj_exp])
+        except Exception as err:
+            logging.exception(json.dumps(submission, indent=2))
+            raise err
     logging.info(f"Retrieved {len(submissions)} qualifier responses")
 
 
