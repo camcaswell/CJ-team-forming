@@ -1,13 +1,19 @@
 import csv
 import json
 import logging
+import os
 import re
 import requests
 from collections import Counter
 from pathlib import Path
 
+from dotenv import load_dotenv
 
-TOKEN = ""
+
+logging.basicConfig(level=logging.INFO)
+load_dotenv()
+
+TOKEN = os.getenv("PYDIS-FORMS-TOKEN")
 
 QUALIFIER_FORM_URL = "https://forms-api.pythondiscord.com/forms/cj10-2023-qualifier/responses"
 CONFIRMATION_FORM_URL = ""
