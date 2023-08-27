@@ -23,7 +23,14 @@ QUALIFIED_CSV = CSV_FOLDER / "qualified.csv"
 CONFIRMED_CSV = CSV_FOLDER / "confirmed.csv"
 BLACKLIST_CSV = CSV_FOLDER / "blacklist.csv"
 MANUAL_UPSERTIONS_CSV = CSV_FOLDER / "manual_upsertions.csv"
+FINAL_PARTICIPANTS_CSV = CSV_FOLDER / "final_participants.csv"
 FINAL_TEAMS_CSV = CSV_FOLDER / "final_teams.csv"
+
+QUALIFIED_HEADERS = ["discord_id", "discord_username", "age", "timezone", "python_experience", "git_experience", "team_leader", "codejam_experience"]
+CONFIRMED_HEADERS = ["discord_id", "github_username"]
+BLACKLIST_HEADERS = ["discord_id", "discord_username", "github_username"]
+FINAL_PARTICIPANTS_HEADERS = ["discord_id", "discord_username", "gh_username", "timezone", "python_experience", "git_experience", "age", "codejam_experience", "team_leader", "lead_priority"]
+# Manual upsertion headers should match final participants headers
 
 # These are the literal form values. If the answers on the form are changed, these also need to be changed.
 # The order of these matters.
@@ -83,29 +90,31 @@ def parse_tz(raw_string: str) -> float:
 
 def write_qualified_csv():
     """
-    Get responses from the qualifier form and write to CSV.
+    Record raw responses from qualifier form.
+    Does not filter to only participants who have confirmed, and may include multiple records per person.
     """
     response = requests.get(QUALIFIER_FORM_URL, cookies={"token": TOKEN})
     response.raise_for_status()
     submissions = response.json()
     with open(QUALIFIED_CSV, "w", encoding="utf-8") as file:
-        writer = csv.writer(file, lineterminator="\n")
-        writer.writerow(["discord_username", "discord_id", "age", "timezone", "python_experience", "git_experience", "team_leader", "lead_priority", "code_jam_experience"])
-        try:
-            for submission in submissions:
-                username = submission["user"]["username"]
-                id = submission["user"]["id"]
-                age = submission["response"]["age-range"]
-                tz = submission["response"]["timezone"]
-                py_exp = submission["response"]["python-experience"].replace("have possible worked", "have possibly worked") # Typo fix in 2023, if it is not 2023 you can delete this
-                py_exp = PYTHON_EXPERIENCE.index(py_exp)
-                git_exp = GIT_EXPERIENCE.index(submission["response"]["git-experience"])
-                team_leader = submission["response"]["team-leader"]
-                cj_exp = submission["response"]["code-jam-experience"]
-                writer.writerow([username, id, age, tz, py_exp, git_exp, team_leader, "", cj_exp])
-        except Exception as err:
-            logging.exception(json.dumps(submission, indent=2))
-            raise err
+        writer = csv.DictWriter(file, lineterminator="\n", fieldnames=QUALIFIED_HEADERS)
+        writer.writeheader()
+        for submission in submissions:
+            try:
+                person_info = {
+                    "discord_id": submission["user"]["id"],
+                    "discord_username": submission["user"]["username"],
+                    "age": submission["response"]["age-range"],
+                    "timezone": submission["response"]["timezone"],
+                    "python_experience": submission["response"]["python-experience"],
+                    "git_experience": submission["response"]["git-experience"],
+                    "team_leader": submission["response"]["team-leader"],
+                    "codejam_experience": submission["response"]["code-jam-experience"],
+                }
+                writer.writerow(person_info)
+            except Exception as err:
+                logging.exception(json.dumps(submission, indent=2))
+                raise err
     logging.info(f"Retrieved {len(submissions)} qualifier responses")
 
 
@@ -118,23 +127,27 @@ def write_confirmed_csv():
     submissions = response.json()
     participation_count = 0
     with open(CONFIRMED_CSV, "w") as file:
-        writer = csv.writer(file, lineterminator="\n")
-        writer.writerow(["discord_id", "github_username"])
+        writer = csv.DictWriter(file, lineterminator="\n", fieldnames=CONFIRMED_HEADERS)
+        writer.writeheader()
         try:
             for submission in submissions:
                 if submission["response"]["participation"] != "Yes":
                     continue
                 participation_count += 1
-                writer.writerow([submission["user"]["id"], submission["response"]["github"]])
+                writer.writerow({
+                    "discord_id": submission["user"]["id"],
+                    "github_username": submission["response"]["github"],
+                })
         except Exception as err:
             logging.exception(json.dumps(submission, indent=2))
             raise err
     logging.info(f"Retrieved {len(submissions)} confirmation responses, {participation_count} confirmed")
 
 
-def load_final_participants() -> list[Person]:
+def write_final_participants_csv():
     """
-    Read the 4 CSVs and cross-reference to get final participants.
+    Cross reference qualified, confirmed, blacklisted, and upsertions to obtain the final list of pariticipants.
+    Allows manual review and vetting for leaders before starting the team-forming.
     """
     with open(BLACKLIST_CSV, encoding="utf-8") as file:
         blacklist = {line["discord_id"] for line in csv.DictReader(file)}
@@ -146,49 +159,61 @@ def load_final_participants() -> list[Person]:
 
     with open(QUALIFIED_CSV, encoding="utf-8") as file:
         qualified: dict[int, dict] = {}
-        for line in csv.DictReader(file):
-            d_id = int(line["discord_id"])
+        for person in csv.DictReader(file):
+            d_id = int(person["discord_id"])
             if (d_id in blacklist) or (d_id not in confirmed):
                 continue
-            qualified[d_id] = {**line, "github_username": confirmed[d_id]["github_username"]}
+            py_exp = person["python_experience"].replace("have possible worked", "have possibly worked") # Typo fix in 2023; if it is not 2023 you can delete this
+            person["python_experience"] = PYTHON_EXPERIENCE.index(py_exp)
+            person["git_experience"] = GIT_EXPERIENCE.index(person["git_experience"])
+            qualified[d_id] = {**person, "github_username": confirmed[d_id]["github_username"]}
     logging.info(f"Loaded {len(qualified)} qualified people")
 
-    with open(MANUAL_UPSERTIONS_CSV, encoding="utf-8") as file:
-        upsertions = {int(line["discord_id"]): line for line in csv.DictReader(file)}
-    logging.info(f"Loaded {len(upsertions)} upsertions")
-    
-    for d_id, upsertion in upsertions.items():
-        if d_id not in qualified:
-            qualified[d_id] = {}
-        # Check validity/completeness of info?
-        qualified[d_id].update(upsertion)
+    try:
+        with open(MANUAL_UPSERTIONS_CSV, encoding="utf-8") as file:
+            upsertions = list(csv.DictReader(file))
+        for upsertion in upsertions:
+            d_id = int(upsertion["discord_id"])
+            if d_id not in qualified:
+                qualified[d_id] = {}
+            upsertion = {key.strip(): val.strip() for key, val in upsertion.items()}
+            upsertion = {key: val for key, val in upsertion.items() if val != ""}
+            qualified[d_id].update(upsertion)
+        logging.info(f"Loaded {len(upsertions)} upsertions")
+    except FileNotFoundError:
+        pass
 
-    people: list[Person] = []
-    for d_id, person_info in qualified.items():
-        try:
+    with open(FINAL_PARTICIPANTS_CSV, "w") as file:
+        writer = csv.DictWriter(file, lineterminator="\n", fieldnames=FINAL_PARTICIPANTS_HEADERS)
+        writer.writeheader()
+        for d_id, person_info in qualified.items():
             person_info = {
-                key.strip(): val.strip()
+                key: val
                 for key,val in person_info.items()
-                if key not in ("age", "solution", "code_jam_experience")
+                if key in FINAL_PARTICIPANTS_HEADERS
             }
+            writer.writerow(person_info)
+    
 
-            name = person_info["discord_username"]
-            gh_name = person_info["github_username"]
-
-            tz = parse_tz(person_info["timezone"])
-
-            exp = int(person_info["python_experience"]) + int(person_info["git_experience"])
-
-            if "lead_priority" in person_info:
+def load_final_participants() -> list[Person]:
+    """
+    Load the final participants to begin team-forming.
+    The final participants CSV should already have been manually reviewed, leaders vetted, and lead_prority set.
+    """
+    people: list[Person] = []
+    with open(FINAL_PARTICIPANTS_CSV, encoding="utf-8") as file:
+        for person_info in csv.DictReader(file):
+            try:
+                d_id = int(person_info["discord_id"])
+                name = person_info["discord_username"]
+                gh_name = person_info["github_username"]
+                tz = parse_tz(person_info["timezone"])
+                exp = int(person_info["python_experience"]) + int(person_info["git_experience"])
                 lead_priority = int(person_info["lead_priority"])
-            else:
-                lead_priority = LEADER.index(person_info["team_leader"])
-
-            people.append(Person(d_id, tz, exp, lead_priority, name=name, gh_name=gh_name))
-
-        except Exception as err:
-            logging.debug(json.dumps(person_info, indent=2))
-            raise err
+                people.append(Person(d_id, tz, exp, lead_priority, name=name, gh_name=gh_name))
+            except Exception as err:
+                logging.debug(json.dumps(person_info, indent=2))
+                raise err
 
     # Sanity checks
     logging.info(f"Loaded info for {len(people)} participants")
@@ -197,4 +222,7 @@ def load_final_participants() -> list[Person]:
     logging.info(f"Leads: {sorted(Counter(p.lead_priority for p in people).items())}")
     return people
 
-
+if __name__ == "__main__":
+    write_qualified_csv()
+    write_confirmed_csv()
+    write_final_participants_csv()
