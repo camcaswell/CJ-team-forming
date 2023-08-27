@@ -29,7 +29,7 @@ FINAL_TEAMS_CSV = CSV_FOLDER / "final_teams.csv"
 QUALIFIED_HEADERS = ["discord_id", "discord_username", "age", "timezone", "python_experience", "git_experience", "team_leader", "codejam_experience"]
 CONFIRMED_HEADERS = ["discord_id", "github_username"]
 BLACKLIST_HEADERS = ["discord_id", "discord_username", "github_username"]
-FINAL_PARTICIPANTS_HEADERS = ["discord_id", "discord_username", "gh_username", "timezone", "python_experience", "git_experience", "age", "codejam_experience", "team_leader", "lead_priority"]
+FINAL_PARTICIPANTS_HEADERS = ["discord_id", "discord_username", "github_username", "timezone", "python_experience", "git_experience", "age", "codejam_experience", "team_leader", "lead_priority"]
 # Manual upsertion headers should match final participants headers
 
 # These are the literal form values. If the answers on the form are changed, these also need to be changed.
