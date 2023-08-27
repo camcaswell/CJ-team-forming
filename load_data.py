@@ -154,6 +154,7 @@ def write_final_participants_csv():
     logging.info(f"Loaded {len(blacklist)} blacklisted people")
     
     with open(CONFIRMED_CSV, encoding="utf-8") as file:
+        # Latest submission for each Discord ID will be used.
         confirmed = {int(line["discord_id"]): line for line in csv.DictReader(file)}
     logging.info(f"Loaded {len(confirmed)} confirmed people")
 
@@ -166,6 +167,7 @@ def write_final_participants_csv():
             py_exp = person["python_experience"].replace("have possible worked", "have possibly worked") # Typo fix in 2023; if it is not 2023 you can delete this
             person["python_experience"] = PYTHON_EXPERIENCE.index(py_exp)
             person["git_experience"] = GIT_EXPERIENCE.index(person["git_experience"])
+            # Latest submission for each Discord ID will be used.
             qualified[d_id] = {**person, "github_username": confirmed[d_id]["github_username"]}
     logging.info(f"Loaded {len(qualified)} qualified people")
 
