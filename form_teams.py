@@ -3,7 +3,7 @@ import logging
 from collections import Counter
 from statistics import mean
 
-from load_data import load_final_participants, Person, write_confirmed_csv, write_qualified_csv
+from load_data import load_final_participants, Person
 
 
 logging.basicConfig(level=logging.DEBUG)
