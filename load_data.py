@@ -10,7 +10,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.DEBUG)
 load_dotenv()
 
 TOKEN = os.getenv("PYDIS-FORMS-TOKEN")
@@ -200,11 +200,17 @@ def load_final_participants() -> list[Person]:
     Load the final participants to begin team-forming.
     The final participants CSV should already have been manually reviewed, leaders vetted, and lead_prority set.
     """
+    with open(BLACKLIST_CSV, encoding="utf-8" ) as file:
+        # These should already be filtered out, but this allows adding to the blacklist after manual vetting.
+        blacklist = [int(line["discord_id"]) for line in csv.DictReader(file)]
+
     people: list[Person] = []
     with open(FINAL_PARTICIPANTS_CSV, encoding="utf-8") as file:
         for person_info in csv.DictReader(file):
             try:
                 d_id = int(person_info["discord_id"])
+                if d_id in blacklist:
+                    continue
                 name = person_info["discord_username"]
                 gh_name = person_info["github_username"]
                 tz = parse_tz(person_info["timezone"])
