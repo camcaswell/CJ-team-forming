@@ -46,11 +46,6 @@ GIT_EXPERIENCE = (
     "I'm pretty familiar with Git and use it regularly",
     "I can cherry-pick a remote branch using the disturbance ripples of butterflies",
 )
-LEADER = (
-    "No",
-    "I'm OK either way",
-    "Yes",
-)
 
 
 class Person:
