@@ -292,22 +292,11 @@ def generate_teams_report():
 
 
 if __name__ == "__main__":
-    # GET and write CSV
-    # write_qualified_csv()
-
-    # GET and write CSV
-    # Possibly will be manual if we go with a bot button for confirmation.
-    # write_confirmed_csv()
-
-    # Cross reference qualified, confirmed, and blacklisted, then do manual upsertions
     PEOPLE = load_final_participants()
     assert len(PEOPLE) == len(set(PEOPLE))
     EXP_AVG = mean(p.exp for p in PEOPLE)
 
-    # Run algo
     form_teams()
-    
-    # Record generated teams
     write_teams_csv()
 
     assert sum(len(team) for team in TEAMS) + len(UNASSIGNED) == len(PEOPLE)
